@@ -1,13 +1,17 @@
 --[[
 
 Checking Types:
-Commander.CheckType("string", "Hello") --> true
+
+Commander.CheckType("string", "Hello") --> No error, doesn't return anything
+Commander.CheckType("string", true) --> Throws an error with a message: "string expected, got boolean"
 
 Adding Commands:
 Commander.AddCommand({ "test" }, "Test command", print) 
 
 Getting Command Information:
-print(Commander.GetCommandInfo("test")) --> { "test", "Test command" }
+local commandInfo = Commander.GetCommandInfo("test") --> { Name = "test", Description = "Test command" }
+print(commandInfo.Name) --> "test"
+print(commandInfo.Description) --> "Test command"
 
 Running Commands:
 Commander.RunCommand("test") --> prints "Hello"
@@ -19,16 +23,11 @@ local Commander = {
 	Commands = {},
 }
 
--- Checks the type of value
+-- Checks the type of value. Throws an error if type is invalid
 -- @param The type to check
--- @paran The value to check
--- @return returns true if the value is of the type
+-- @param The value to check
 function Commander.CheckType(Type, Value)
-	if type(Value) == Type then
-		return true
-	else
-		return false, warn(debug.traceback(Type .. " expected, got " .. type(Value)))
-	end
+	assert(type(Value) == Type, debug.traceback(Type.." expected, got "..type(Value)))
 end
 
 -- Add a command to the list of commands
@@ -84,13 +83,16 @@ end
 
 -- Get information about a command
 -- @param Name: The name of the command to get information about.
--- @return returns the name of the comman and the description of the command in a table.
+-- @return returns the name of the command and the description of the command in a table.
 function Commander.GetCommandInfo(Name)
 	Commander.CheckType("string", Name)
 
 	for _, v in ipairs(Commander.Commands) do
 		if table.find(v.Name, Name:lower()) then
-			return { v.Name, v.Description }
+			return {
+				Name = v.Name,
+				Description = v.Description
+			}
 		end
 	end
 end
