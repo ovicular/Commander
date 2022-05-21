@@ -1,100 +1,101 @@
 --[[
-
-Checking Types:
-
-Commander.CheckType("string", "Hello") --> No error, doesn't return anything
-Commander.CheckType("string", true) --> Throws an error with a message: "string expected, got boolean"
-
-Adding Commands:
-Commander.AddCommand({ "test" }, "Test command", print) 
-
-Getting Command Information:
-local commandInfo = Commander.GetCommandInfo("test") --> { Name = "test", Description = "Test command" }
-print(commandInfo.Name) --> "test"
-print(commandInfo.Description) --> "Test command"
-
-Running Commands:
-Commander.RunCommand("test") --> prints "Hello"
-
+	nickk#5538
+	Commander | 5/21/2022
 ]]
+
+_VERSION = "1.1.0"
 
 local Commander = {
 	Prefix = "'",
 	Commands = {},
+
+	Types = {
+		["string"] = function(String)
+			return String
+		end,
+		["number"] = function(Number)
+			return tonumber(Number)
+		end,
+		["boolean"] = function(Bool)
+			return (Bool == "true") or false
+		end,
+		["integer"] = function(Number)
+			return math.floor(tonumber(Number))
+		end,
+	},
 }
 
--- Checks the type of value. Throws an error if type is invalid
--- @param The type to check
--- @param The value to check
-function Commander.CheckType(Type, Value)
-	assert(type(Value) == Type, debug.traceback(Type.." expected, got "..type(Value)))
+Commander.__index = Commander
+
+-- Asserts that the given argument is the given type.
+-- @param Value The argument to check
+-- @param Type The type to check for
+-- @return true or false
+function Commander.assertType(Type, Value)
+	assert(type(Value) == Type, debug.traceback(Type .. " expected, got " .. type(Value)))
+	return true
 end
 
--- Add a command to the list of commands
--- @param Name: The name of the command.
--- @param Description: The description of the command.
--- @param Callback: The function to call when the command is executed.
-function Commander.AddCommand(Name, Description, Callback)
-	Commander.CheckType("table", Name)
-	Commander.CheckType("string", Description)
-	Commander.CheckType("function", Callback)
-
-	Commander.Commands[#Commander.Commands + 1] = {
-		Name = Name or {},
-		Description = Description or "",
-		Callback = Callback or function() end,
-	}
+-- Adds a command to the commander table.
+-- @param Data table containing the command data
+function Commander.addCommand(Data)
+	Commander.assertType("table", Data)
+	Commander.Commands[Data.Name] = Data
 end
 
--- Execute a command (Step 1)
--- @param Name: The name of the command to execute.
-function Commander.RunCommandI(Name)
-	Commander.CheckType("string", Name)
+-- Runs a command with the given arguments.
+-- @param Name The command to run and the arguments to pass following the prefix
+function Commander.singleRun(Name)
+	Commander.assertType("string", Name)
 
 	local Name = Name:match("^%s*(.-)%s*$")
 
-	if Name:sub(1, #Commander.Prefix):lower() == Commander.Prefix then
-		Name = Name:sub(#Commander.Prefix + 1)
+	local Prefix = Commander.Prefix
+	if Name:sub(1, #Prefix):lower() == Prefix then
+		Name = Name:sub(#Prefix + 1)
 	end
 
-	local Parsed = Name:split(" ")
+	local function splitName()
+		return Name:split(" ")
+	end
+
+	local commandName = splitName()[1]:lower()
+	local Parsed = splitName()
 	table.remove(Parsed, 1)
 
-	for _, v in ipairs(Commander.Commands) do
-		local Cached = Name:split(" ")[1]:lower()
+	for _, Command in next, Commander.Commands do
+		if table.find(Command.Name, commandName) then
+			for Index, Argument in next, Parsed do
+				local Type = Command.Type
+				assert(Commander.Types[Type], "Type '" .. Type .. "' not found")
+				Parsed[Index] = Commander.Types[Type](Argument)
+			end
 
-		if table.find(v.Name, Cached) then
-			return task.spawn(xpcall, v.Callback, function(err)
+			return task.spawn(xpcall, Command.Callback, function(err)
 				warn(debug.traceback(err):gsub("[\n\r]+", "\n    "))
 			end, unpack(Parsed))
 		end
 	end
 end
 
--- Execute a command (Step 2)
--- @param Name: The name of the command or commands to execute.
-function Commander.RunCommand(Name)
-	Commander.CheckType("string", Name)
+-- Runs a command with the given arguments (Multiple in one line split using the given delimiter).
+-- @param Name The command to run and the arguments to pass following the prefix
+-- @param Delimiter The delimiter to split the commands with
+function Commander.bulkRun(Name, Delimiter)
+	local Delimiter = Delimiter or "\\"
 
-	for v in Name:match("^%s*(.-)%s*$"):gsub("\\+", "\\"):match("^\\*(.-)\\*$"):gmatch("[^\\]+") do
-		Commander.RunCommandI(v)
+	Commander.assertType("string", Name)
+	Commander.assertType("string", Delimiter)
+
+	for v in
+		Name
+			:match("^%s*(.-)%s*$")
+			:gsub(Delimiter .. "+", Delimiter)
+			:match("^" .. Delimiter .. "*(.-)" .. Delimiter .. "*$")
+			:gmatch("[^" .. Delimiter .. "]+")
+	do
+		Commander.singleRun(v)
 	end
 end
 
--- Get information about a command
--- @param Name: The name of the command to get information about.
--- @return returns the name of the command and the description of the command in a table.
-function Commander.GetCommandInfo(Name)
-	Commander.CheckType("string", Name)
-
-	for _, v in ipairs(Commander.Commands) do
-		if table.find(v.Name, Name:lower()) then
-			return {
-				Name = v.Name,
-				Description = v.Description
-			}
-		end
-	end
-end
-
-
+return Commander, warn("[Commander]: v" .. _VERSION .. " loaded")
