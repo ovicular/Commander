@@ -33,7 +33,6 @@ Commander.__index = Commander
 -- @return true or false
 function Commander.assertType(Type, Value)
 	assert(type(Value) == Type, debug.traceback(Type .. " expected, got " .. type(Value)))
-	return true
 end
 
 -- Adds a command to the commander table.
