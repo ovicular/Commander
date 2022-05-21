@@ -43,7 +43,7 @@ function Commander.addCommand(Data)
 end
 
 -- Runs a command with the given arguments.
--- @param Name The command to run and the arguments to pass following the prefix
+-- @param Name of the command to run and the arguments to pass following the prefix
 function Commander.singleRun(Name)
 	Commander.assertType("string", Name)
 
